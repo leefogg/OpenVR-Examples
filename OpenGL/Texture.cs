@@ -39,6 +39,8 @@ namespace OpenGL
                 GL.GenerateMipmap(GenerateMipmapTarget.Texture2D);
         }
 
-        public void Bind() => GL.BindTexture(TextureTarget.Texture2D, Handle);
+        public void Bind() => Bind(Handle);
+
+        public static void Bind(int handle) => GL.BindTexture(TextureTarget.Texture2D, handle);
     }
 }

@@ -63,6 +63,11 @@ namespace OpenGL
             GL.UniformMatrix4(GL.GetUniformLocation(Handle, name), false, ref mat);
         }
 
+        public void SetVec2(string name, ref Vector2 vector)
+        {
+            GL.Uniform2(GL.GetUniformLocation(Handle, name), ref vector);
+        }
+
         public void SetInt(string name, int value)
         {
             GL.Uniform1(GL.GetUniformLocation(Handle, name), value);

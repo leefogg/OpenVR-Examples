@@ -121,12 +121,12 @@ namespace OpenGL
             var verts = new float[]
             {
                 1, 1, 1, 1, // Top right
-                1, 0, 1, 0, // Bottom right
+                1, -1, 1, 0, // Bottom right
                 -1, -1, 0, 0, // Bottom left
 
+                -1, -1, 0, 0, // Bottom left
                 -1, 1, 0, 1, // Top left
                 1, 1, 1, 1, // Top right
-                1, 0, 1, 0, // Bottom right
             };
 
             QuadVAO = GL.GenVertexArray();
@@ -269,6 +269,24 @@ namespace OpenGL
             FrameBuffer.BindDefault();
             GL.ClearColor(0, 0, 0, 0);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            Texture2D.Bind();
+            Vector2 scale = new Vector2(0.5f, 1f);
+            Texture2D.SetVec2("scale", ref scale);
+            Texture2D.SetInt("texture0", 0);
+
+            // Draw a quad on the left and right half of the screen - one for each eye
+            for (int i = 0; i < 2; i++)
+            {
+                Vector2 offset = new Vector2(1f * i - 0.5f, 0);
+                Texture2D.SetVec2("offset", ref offset);
+
+                GL.ActiveTexture(TextureUnit.Texture0);
+                Texture.Bind(Eyes[i].FrameBuffer.Handle);
+
+                GL.BindVertexArray(QuadVAO);
+                GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+            }
         }
 
         private void SubmitEyes()
