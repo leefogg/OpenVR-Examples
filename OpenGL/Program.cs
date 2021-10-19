@@ -21,7 +21,7 @@ namespace OpenGL
                 Flags = ContextFlags.Debug,
                 Size = new Vector2i(1920, 1080),
                 IsEventDriven = false,
-                Title = "prototype engine"
+                Title = "OpenGL using OpenVR"
             };
             nativeWindowSettings.Location = new Vector2i(
                 3840 / 2 - nativeWindowSettings.Size.X / 2,
