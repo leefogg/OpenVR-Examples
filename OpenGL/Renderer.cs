@@ -24,6 +24,8 @@ namespace OpenGL
             public Matrix4 ProjectionMatrix;
             public Matrix4 ViewMatrix;
             public FrameBuffer FrameBuffer;
+            public int HiddenAreaMeshVAO;
+            public int HiddenAreaMeshNumElements;
         }
 
         private Texture DebugTexture;
@@ -46,12 +48,12 @@ namespace OpenGL
 
             SetUpOpenVR();
             SetUpStereoRenderTargets();
+            LoadHiddenAreaMeshes();
             SetUpFullScreenQuad();
             SetUpDebugTexture();
             SetUpShaders();
             SetUpFloor();
         }
-
         private void SetUpFloor()
         {
             var verts = new float[]
@@ -120,13 +122,13 @@ namespace OpenGL
         {
             var verts = new float[]
             {
-                1, 1, 1, 1, // Top right
+                -1, -1, 0, 0, // Bottom left
                 1, -1, 1, 0, // Bottom right
-                -1, -1, 0, 0, // Bottom left
-
-                -1, -1, 0, 0, // Bottom left
-                -1, 1, 0, 1, // Top left
                 1, 1, 1, 1, // Top right
+
+                1, 1, 1, 1, // Top right
+                -1, 1, 0, 1, // Top left
+                -1, -1, 0, 0, // Bottom left
             };
 
             QuadVAO = GL.GenVertexArray();
@@ -231,6 +233,47 @@ namespace OpenGL
             Eyes[(int)EVREye.Eye_Right].FrameBuffer = new FrameBuffer(width, height, true, "rightEye");
         }
 
+        private void LoadHiddenAreaMeshes()
+        {
+            for (int eye = 0; eye < 2; eye++)
+            {
+                var mesh = system.GetHiddenAreaMesh((EVREye)eye, EHiddenAreaMeshType.k_eHiddenAreaMesh_Standard);
+                var numVertcies = (int)(mesh.unTriangleCount * 3);
+                Eyes[eye].HiddenAreaMeshNumElements = numVertcies;
+                var translatedVerts = new Vector2[numVertcies];
+                var sizeofHmdVector2_t = sizeof(float) * 2;
+                for (int i = 0; i < numVertcies; i++)
+                {
+                    var vert = (HmdVector2_t)Marshal.PtrToStructure(mesh.pVertexData + i * sizeofHmdVector2_t, typeof(HmdVector2_t));
+                    translatedVerts[i] = new Vector2(vert.v0 * 2 - 1, vert.v1 * 2 - 1);
+                }
+
+                var vao = GL.GenVertexArray();
+                GL.BindVertexArray(vao);
+
+                var vbo = GL.GenBuffer();
+                GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+                GL.ObjectLabel(ObjectLabelIdentifier.Buffer, vao, 11, "HiddenMesh" + eye);
+                GL.BufferData(
+                    BufferTarget.ArrayBuffer,
+                    translatedVerts.Length * sizeofHmdVector2_t,
+                    translatedVerts,
+                    BufferUsageHint.StaticDraw
+                );
+                GL.VertexAttribPointer(
+                    0,
+                    2,
+                    VertexAttribPointerType.Float,
+                    false,
+                    sizeofHmdVector2_t,
+                    (IntPtr)0
+                );
+                GL.EnableVertexAttribArray(0);
+
+                Eyes[eye].HiddenAreaMeshVAO = vao;
+            }
+        }
+
         protected override void OnRenderFrame(FrameEventArgs args)
         {
             GL.Disable(EnableCap.CullFace);
@@ -271,14 +314,15 @@ namespace OpenGL
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             Texture2D.Bind();
-            Vector2 scale = new Vector2(0.5f, 1f);
+            Vector2 scale = new Vector2(0.5f, 0.5f);
             Texture2D.SetVec2("scale", ref scale);
             Texture2D.SetInt("texture0", 0);
+            Texture2D.SetFloat("opacity", 1);
 
             // Draw a quad on the left and right half of the screen - one for each eye
             for (int i = 0; i < 2; i++)
             {
-                Vector2 offset = new Vector2(1f * i - 0.5f, 0);
+                Vector2 offset = new Vector2(1f * i - 0.5f,  -0.5f);
                 Texture2D.SetVec2("offset", ref offset);
 
                 GL.ActiveTexture(TextureUnit.Texture0);
@@ -319,17 +363,30 @@ namespace OpenGL
             GL.Viewport(0, 0, eye.FrameBuffer.Width, eye.FrameBuffer.Height);
             GL.ClearColor(.1f, .1f, .5f, 0);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            var viewMatrix = HMDPose * eye.ViewMatrix;
 
-            var modelMatrix = Matrix4.CreateScale(5);
+            // Draw hidden area mesh
+            Texture2D.Bind();
+            Vector2 scale = new Vector2(1f, 1f);
+            Texture2D.SetVec2("scale", ref scale);
+            Texture2D.SetInt("texture0", 0);
+            Texture2D.SetFloat("opacity", 0); // Draw black
+            Vector2 offset = new Vector2(0, 0);
+            Texture2D.SetVec2("offset", ref offset);
+            GL.Disable(EnableCap.CullFace);
+            GL.BindVertexArray(eye.HiddenAreaMeshVAO);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, eye.HiddenAreaMeshNumElements);
+            GL.Enable(EnableCap.CullFace);
+
+            // Draw floor
             Texture3D.Bind();
+            var viewMatrix = HMDPose * eye.ViewMatrix;
+            var modelMatrix = Matrix4.CreateScale(5);
             GL.ActiveTexture(TextureUnit.Texture0);
             DebugTexture.Bind();
             Texture3D.SetMat4("ModelMatrix", ref modelMatrix);
             Texture3D.SetMat4("ViewMatrix", ref viewMatrix);
             Texture3D.SetMat4("ProjectionMatrix", ref eye.ProjectionMatrix);
             Texture3D.SetInt("texture0", 0);
-
             GL.BindVertexArray(FloorVAO);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
