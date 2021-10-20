@@ -54,6 +54,7 @@ namespace OpenGL
             SetUpShaders();
             SetUpFloor();
         }
+
         private void SetUpFloor()
         {
             var verts = new float[]
@@ -229,8 +230,8 @@ namespace OpenGL
         {
             uint width = 0, height = 0;
             system.GetRecommendedRenderTargetSize(ref width, ref height);
-            Eyes[(int)EVREye.Eye_Left].FrameBuffer  = new FrameBuffer(width, height, true, "leftEye");
-            Eyes[(int)EVREye.Eye_Right].FrameBuffer = new FrameBuffer(width, height, true, "rightEye");
+            Eyes[(int)EVREye.Eye_Left].FrameBuffer  = new FrameBuffer(width, height, false, true, "leftEye");
+            Eyes[(int)EVREye.Eye_Right].FrameBuffer = new FrameBuffer(width, height, false, true, "rightEye");
         }
 
         private void LoadHiddenAreaMeshes()
