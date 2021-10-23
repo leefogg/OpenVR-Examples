@@ -23,9 +23,10 @@ namespace OpenGL
         {
             public Matrix4 ProjectionMatrix;
             public Matrix4 ViewMatrix;
-            public FrameBuffer FrameBuffer;
             public int HiddenAreaMeshVAO;
             public int HiddenAreaMeshNumElements;
+            public int FrameBufferHandle;
+            public int FrameBufferColorHandle;
         }
 
         private Texture DebugTexture;
@@ -34,6 +35,9 @@ namespace OpenGL
         private int QuadVAO;
         private Matrix4 HMDPose;
         private Eye[] Eyes = new Eye[2];
+        private int FrameBufferHandle;
+
+        public int EyeWidth, EyeHeight;
 
         public Renderer(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings) 
             : base(gameWindowSettings, nativeWindowSettings)
@@ -47,7 +51,7 @@ namespace OpenGL
             SetUpOpenGLErrorCallback();
 
             SetUpOpenVR();
-            SetUpStereoRenderTargets();
+            SetUpFrameBuffer();
             LoadHiddenAreaMeshes();
             SetUpFullScreenQuad();
             SetUpDebugTexture();
@@ -226,12 +230,61 @@ namespace OpenGL
             m.ToOpenTK(ref output);
         }
 
-        private void SetUpStereoRenderTargets()
+        private void SetUpFrameBuffer()
         {
             uint width = 0, height = 0;
             system.GetRecommendedRenderTargetSize(ref width, ref height);
-            Eyes[(int)EVREye.Eye_Left].FrameBuffer  = new FrameBuffer(width, height, false, true, "leftEye");
-            Eyes[(int)EVREye.Eye_Right].FrameBuffer = new FrameBuffer(width, height, false, true, "rightEye");
+            EyeWidth = (int)width;
+            EyeHeight = (int)height;
+
+
+            // for GL_MultiView, attachments must be arrays, one layer per "eye"
+            FrameBufferHandle = GL.GenFramebuffer();
+            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, FrameBufferHandle);
+
+            var colorAttachment = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2DArray, colorAttachment);
+            GL.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureBorderColor, new[] { 1f, 0f, 1f });
+            GL.TexStorage3D(TextureTarget3d.Texture2DArray, 1, SizedInternalFormat.Rgba8, EyeWidth, EyeHeight, 2);
+            GL.Ovr.FramebufferTextureMultiview(FramebufferTarget.DrawFramebuffer, FramebufferAttachment.ColorAttachment0, colorAttachment, 0, 0, 2);
+
+            var depthAttachment = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2DArray, depthAttachment);
+            GL.TexStorage3D(TextureTarget3d.Texture2DArray, 1, (SizedInternalFormat)All.DepthComponent24, EyeWidth, EyeHeight, 2);
+            GL.Ovr.FramebufferTextureMultiview(FramebufferTarget.DrawFramebuffer, FramebufferAttachment.DepthAttachment, depthAttachment, 0, 0, 2);
+            var error = GL.CheckFramebufferStatus(FramebufferTarget.DrawFramebuffer);
+
+            // Easiest way to render hidden area mesh to just one eye is to create a framebuffer for each eye
+            // Dont want to copy the result after, luckly GL allows us to alias the texture arrays above
+            // So, create two Framebuffers, one for each eye, re-using one layer of texture arrays used above each
+
+            var leftEyeFBO = GL.GenFramebuffer();
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, leftEyeFBO);
+            var leftEye = GL.GenTexture();
+            var leftEyeDepth = GL.GenTexture();
+            GL.TextureView(leftEye, TextureTarget.Texture2D, colorAttachment, PixelInternalFormat.Rgba8, 0, 1, 0, 1);
+            GL.TextureView(leftEyeDepth, TextureTarget.Texture2D, depthAttachment, PixelInternalFormat.DepthComponent24, 0, 1, 0, 1);
+            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, leftEye, 0);
+            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, TextureTarget.Texture2D, leftEyeDepth, 0);
+            error = GL.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+            Eyes[0].FrameBufferHandle = leftEyeFBO;
+            Eyes[0].FrameBufferColorHandle = leftEye;
+
+            var rightEyeFBO = GL.GenFramebuffer();
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, rightEyeFBO);
+            var rightEye = GL.GenTexture();
+            var rightEyeDepth = GL.GenTexture();
+            GL.TextureView(rightEye, TextureTarget.Texture2D, colorAttachment, PixelInternalFormat.Rgba8, 0, 1, 1, 1);
+            GL.TextureView(rightEyeDepth, TextureTarget.Texture2D, depthAttachment, PixelInternalFormat.DepthComponent24, 0, 1, 1, 1);
+            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, rightEye, 0);
+            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, TextureTarget.Texture2D, rightEyeDepth, 0);
+            error = GL.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+            Eyes[1].FrameBufferHandle = rightEyeFBO;
+            Eyes[1].FrameBufferColorHandle = rightEye;
         }
 
         private void LoadHiddenAreaMeshes()
@@ -281,8 +334,12 @@ namespace OpenGL
             GL.Disable(EnableCap.Blend);
             GL.Enable(EnableCap.DepthTest);
 
-            for (int i = 0; i < 2; i++)
-                RenderScene(Eyes[i]);
+            for (int eye = 0; eye < 2; eye++)
+            {
+                RenderHiddenAreaMesh(Eyes[eye]);
+            }
+
+            RenderScene();
 
             RenderWindow();
             SubmitEyes();
@@ -293,6 +350,26 @@ namespace OpenGL
             SwapBuffers();
 
             base.OnRenderFrame(args);
+        }
+
+        private void RenderHiddenAreaMesh(Eye eye)
+        {
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, eye.FrameBufferHandle);
+            GL.ClearColor(0.1f, 0.1f, 0.1f, 0);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            Texture2D.Bind();
+            Vector2 scale = new Vector2(1f, 1f);
+            Texture2D.SetVec2("scale", ref scale);
+            Texture2D.SetInt("texture0", 0);
+            Texture2D.SetFloat("opacity", 0); // Draw black
+            Vector2 offset = new Vector2(0, 0);
+            Texture2D.SetVec2("offset", ref offset);
+
+            GL.Disable(EnableCap.CullFace);
+            GL.BindVertexArray(eye.HiddenAreaMeshVAO);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, eye.HiddenAreaMeshNumElements);
+            GL.Enable(EnableCap.CullFace);
         }
 
         private void UpdatePoses()
@@ -311,7 +388,6 @@ namespace OpenGL
         private void RenderWindow()
         {
             FrameBuffer.BindDefault();
-            GL.ClearColor(0, 0, 0, 0);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             Texture2D.Bind();
@@ -327,7 +403,7 @@ namespace OpenGL
                 Texture2D.SetVec2("offset", ref offset);
 
                 GL.ActiveTexture(TextureUnit.Texture0);
-                Texture.Bind(Eyes[i].FrameBuffer.Handle);
+                Texture.Bind(Eyes[i].FrameBufferColorHandle);
 
                 GL.BindVertexArray(QuadVAO);
                 GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
@@ -347,7 +423,7 @@ namespace OpenGL
             EVRCompositorError error;
             for (int i = 0; i < 2; i++)
             {
-                eyeTexture.handle = new IntPtr(Eyes[i].FrameBuffer.Handle);
+                eyeTexture.handle = new IntPtr(Eyes[i].FrameBufferColorHandle);
                 error = OpenVR.Compositor.Submit(
                     (EVREye)i,
                     ref eyeTexture, 
@@ -358,35 +434,23 @@ namespace OpenGL
             }
         }
 
-        private void RenderScene(Eye eye)
+        private void RenderScene()
         {
-            eye.FrameBuffer.Bind();
-            GL.Viewport(0, 0, eye.FrameBuffer.Width, eye.FrameBuffer.Height);
-            GL.ClearColor(.1f, .1f, .5f, 0);
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-            // Draw hidden area mesh
-            Texture2D.Bind();
-            Vector2 scale = new Vector2(1f, 1f);
-            Texture2D.SetVec2("scale", ref scale);
-            Texture2D.SetInt("texture0", 0);
-            Texture2D.SetFloat("opacity", 0); // Draw black
-            Vector2 offset = new Vector2(0, 0);
-            Texture2D.SetVec2("offset", ref offset);
-            GL.Disable(EnableCap.CullFace);
-            GL.BindVertexArray(eye.HiddenAreaMeshVAO);
-            GL.DrawArrays(PrimitiveType.Triangles, 0, eye.HiddenAreaMeshNumElements);
-            GL.Enable(EnableCap.CullFace);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, FrameBufferHandle);
+            GL.Viewport(0, 0, EyeWidth, EyeHeight);
 
             // Draw floor
             Texture3D.Bind();
-            var viewMatrix = HMDPose * eye.ViewMatrix;
+            var leftViewMatrix = HMDPose * Eyes[0].ViewMatrix;
+            var rightViewMatrix = HMDPose * Eyes[1].ViewMatrix;
             var modelMatrix = Matrix4.CreateScale(5);
             GL.ActiveTexture(TextureUnit.Texture0);
             DebugTexture.Bind();
             Texture3D.SetMat4("ModelMatrix", ref modelMatrix);
-            Texture3D.SetMat4("ViewMatrix", ref viewMatrix);
-            Texture3D.SetMat4("ProjectionMatrix", ref eye.ProjectionMatrix);
+            Texture3D.SetMat4("ViewMatrix[0]", ref leftViewMatrix);
+            Texture3D.SetMat4("ViewMatrix[1]", ref rightViewMatrix);
+            Texture3D.SetMat4("ProjectionMatrix[0]", ref Eyes[0].ProjectionMatrix);
+            Texture3D.SetMat4("ProjectionMatrix[1]", ref Eyes[1].ProjectionMatrix);
             Texture3D.SetInt("texture0", 0);
             GL.BindVertexArray(FloorVAO);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
