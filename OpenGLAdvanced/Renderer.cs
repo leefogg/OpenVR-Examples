@@ -20,6 +20,8 @@ namespace OpenGLAdvanced
         private int FrameBufferHandle;
         private int FloorVAO;
         private Texture DebugTexture;
+        private int CubeVAO;
+        private Vector3[] RandomPositions;
 
         public Renderer(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings) 
             : base(gameWindowSettings, nativeWindowSettings)
@@ -33,6 +35,13 @@ namespace OpenGLAdvanced
             SetUpShaders();
             LoadFloor();
             LoadHiddenAreaMeshes();
+            CreateCubePositions();
+        }
+
+        private void CreateCubePositions()
+        {
+            var r = new Random();
+            RandomPositions = Enumerable.Range(0, 50).Select(i => new Vector3((float)r.NextDouble(), (float)r.NextDouble(), (float)r.NextDouble())).ToArray();
         }
 
         private void LoadFloor()
@@ -203,6 +212,7 @@ namespace OpenGLAdvanced
             Texture3D.SetMat4("ProjectionMatrix[0]", ref Eyes[0].ProjectionMatrix);
             Texture3D.SetMat4("ProjectionMatrix[1]", ref Eyes[1].ProjectionMatrix);
             Texture3D.SetInt("texture0", 0);
+            Texture3D.SetFloat("textureRepeat", 10);
             GL.BindVertexArray(FloorVAO);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }

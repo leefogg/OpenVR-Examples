@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31702.278
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tacking", "Basic\Tacking.csproj", "{EF8D3B95-B8BB-47E1-8ACD-4320DB004113}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tracking", "Basic\Tracking.csproj", "{EF8D3B95-B8BB-47E1-8ACD-4320DB004113}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "Common\Common.csproj", "{1770CF9C-B3AF-4584-A113-2067BD5A55F6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenGLAdvanced", "OpenGL\OpenGLAdvanced.csproj", "{6F9A7790-0C03-4F6F-BFEE-87C9B1EFD41C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenGLAdvanced", "OpenGLAdvanced\OpenGLAdvanced.csproj", "{6F9A7790-0C03-4F6F-BFEE-87C9B1EFD41C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenGLCommon", "OpenGLCommon\OpenGLCommon.csproj", "{27EAAEEF-0F90-4538-87F5-6D67E7E48772}"
 EndProject
