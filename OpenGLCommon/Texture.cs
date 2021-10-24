@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace OpenGL
+namespace OpenGLCommon
 {
-    class Texture
+    public class Texture
     {
         private readonly int Width;
         private readonly int Height;

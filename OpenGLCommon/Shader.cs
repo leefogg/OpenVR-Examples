@@ -4,9 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace OpenGL
+namespace OpenGLCommon
 {
-    class Shader
+    public class Shader
     {
         private readonly int Handle;
 

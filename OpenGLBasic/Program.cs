@@ -4,7 +4,7 @@ using OpenTK.Windowing.Desktop;
 using System;
 using Valve.VR;
 
-namespace OpenGLAdvanced
+namespace OpenGLBasic
 {
     class Program
     {
@@ -27,7 +27,7 @@ namespace OpenGLAdvanced
                 3840 / 2 - nativeWindowSettings.Size.X / 2,
                 2160 / 2 - nativeWindowSettings.Size.Y / 2
             );
-            using var window = new Renderer(gameWindowSettings, nativeWindowSettings);
+            using var window = new SceneRenderer(gameWindowSettings, nativeWindowSettings);
             window.VSync = VSyncMode.On;
             window.Run();
         }

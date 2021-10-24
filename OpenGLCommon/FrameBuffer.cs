@@ -3,12 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace OpenGL
+namespace OpenGLCommon
 {
     public class FrameBuffer
     {
         public readonly int Width, Height;
-        public int Handle;
+        public int Handle { get; private set; }
+        public int ColorHandle { get; private set; }
+        public int DepthHandle { get; private set; }
 
         public FrameBuffer(uint width, uint height, bool multisample, bool withDepth, string name = "")
         {
@@ -26,8 +28,8 @@ namespace OpenGL
 
             if (multisample)
             {
-                var renderBufferHandle = GL.GenTexture();
-                GL.BindTexture(TextureTarget.Texture2DMultisample, renderBufferHandle);
+                ColorHandle = GL.GenTexture();
+                GL.BindTexture(TextureTarget.Texture2DMultisample, ColorHandle);
                 GL.TexImage2DMultisample(
                     TextureTargetMultisample.Texture2DMultisample,
                     1, 
@@ -39,14 +41,14 @@ namespace OpenGL
                     FramebufferTarget.Framebuffer, 
                     FramebufferAttachment.ColorAttachment0, 
                     TextureTarget.Texture2DMultisample,
-                    renderBufferHandle,
+                    ColorHandle,
                     0
                 );
             }
             else
             {
-                var attachmentHandle = GL.GenTexture();
-                GL.BindTexture(TextureTarget.Texture2D, attachmentHandle);
+                ColorHandle = GL.GenTexture();
+                GL.BindTexture(TextureTarget.Texture2D, ColorHandle);
                 GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
                 GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxLevel, 0);
                 GL.TexImage2D(
@@ -64,7 +66,7 @@ namespace OpenGL
                         FramebufferTarget.Framebuffer,
                         FramebufferAttachment.ColorAttachment0,
                         TextureTarget.Texture2D,
-                        attachmentHandle,
+                        ColorHandle,
                         0
                     );
             }
@@ -83,8 +85,8 @@ namespace OpenGL
         {
             if (multisample)
             {
-                var renderBufferHandle = GL.GenRenderbuffer();
-                GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, renderBufferHandle);
+                DepthHandle = GL.GenRenderbuffer();
+                GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, DepthHandle);
                 GL.RenderbufferStorageMultisample(
                     RenderbufferTarget.Renderbuffer,
                     8,
@@ -95,15 +97,15 @@ namespace OpenGL
                     FramebufferTarget.Framebuffer,
                     FramebufferAttachment.DepthAttachment,
                     RenderbufferTarget.Renderbuffer, 
-                    renderBufferHandle
+                    DepthHandle
                 );
 
-                return renderBufferHandle;
+                return DepthHandle;
             } 
             else
             {
-                var RBOHandle = GL.GenRenderbuffer();
-                GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, RBOHandle);
+                DepthHandle = GL.GenRenderbuffer();
+                GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, DepthHandle);
                 GL.RenderbufferStorage(
                     RenderbufferTarget.Renderbuffer,
                     RenderbufferStorage.DepthComponent,
@@ -114,15 +116,17 @@ namespace OpenGL
                     FramebufferTarget.Framebuffer,
                     FramebufferAttachment.DepthAttachment,
                     RenderbufferTarget.Renderbuffer,
-                    RBOHandle
+                    DepthHandle
                 );
 
-                return RBOHandle;
+                return DepthHandle;
             }
         }
 
-        public void Bind() => GL.BindFramebuffer(FramebufferTarget.Framebuffer, Handle);
+        public void Bind() => Bind(Handle);
 
-        public static void BindDefault() => GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        public static void BindDefault() => Bind(0);
+
+        public static void Bind(int handle) => GL.BindFramebuffer(FramebufferTarget.Framebuffer, handle);
     }
 }
